@@ -6,19 +6,30 @@ from collections import OrderedDict
 
 
 def find_csv_files(folder_path):
-    """递归查找包含 Failed|Fail 的CSV文件"""
+    """
+    递归遍历指定文件夹，查找所有包含 'Failed' 或 'Fail' 的 CSV 文件
+    """
     files = []
     for root, dirs, filenames in os.walk(folder_path):
         for f in filenames:
+            # 只处理 CSV 文件（忽略大小写）
             if not f.lower().endswith('.csv'):
                 continue
+            # 文件名必须包含 Failed 或 Fail
             if 'Failed' in f or 'Fail' in f:
                 files.append(os.path.join(root, f))
     return files
 
 
 def get_project_type(file_path):
-    """根据文件所在文件夹判断项目类型: EOL / FCT / CUS"""
+    """
+    根据文件所在的父文件夹名称判断项目类型
+
+    判断规则:
+        - 父文件夹名含 'EOL'         → 'EOL'
+        - 父文件夹名含 'Function'    → 'FCT'
+        - 父文件夹名含 'Customizing' → 'CUS'
+    """
     parent = os.path.basename(os.path.dirname(file_path))
     if 'EOL' in parent:
         return 'EOL'
@@ -30,11 +41,19 @@ def get_project_type(file_path):
 
 
 def parse_test_time_from_filename(file_path, project_type):
-    """从文件名中解析测试时间 YYYY-MM-DD_HH:MM:SS"""
+    """
+    从文件名中提取测试时间，统一输出为 YYYY-MM-DD_HH:MM:SS 格式
+
+    各项目文件名的日期时间提取规则:
+        - EOL:  文件名中 [2025-11-30][16-20-13] 格式
+        - FCT:  文件名中 [2025-12-02 00-40-24] 格式（日期和时间之间可能有空格）
+        - CUS:  文件名中 #_20251203140309_Failed 格式（14位连续数字的时间戳）
+    """
     basename = os.path.basename(file_path)
     name_no_ext = os.path.splitext(basename)[0]
 
     if project_type == 'EOL':
+        # 匹配: [YYYY-MM-DD][HH-MM-SS]
         m = re.search(r'\[(\d{4}-\d{2}-\d{2})\]\[(\d{2}-\d{2}-\d{2})\]', name_no_ext)
         if m:
             date_part = m.group(1)
@@ -42,6 +61,7 @@ def parse_test_time_from_filename(file_path, project_type):
             return f"{date_part}_{time_part}"
 
     elif project_type == 'FCT':
+        # 匹配: [YYYY-MM-DD HH-MM-SS]（日期和时间之间有空格）
         m = re.search(r'\[(\d{4}-\d{2}-\d{2})\s+(\d{2}-\d{2}-\d{2})\]', name_no_ext)
         if m:
             date_part = m.group(1)
@@ -49,6 +69,7 @@ def parse_test_time_from_filename(file_path, project_type):
             return f"{date_part}_{time_part}"
 
     elif project_type == 'CUS':
+        # 匹配: #_YYYYMMDDHHmmss_Failed
         m = re.search(r'#_(\d{14})_Failed', name_no_ext)
         if m:
             dt_str = m.group(1)
@@ -59,21 +80,26 @@ def parse_test_time_from_filename(file_path, project_type):
 
 
 def extract_dmc(file_path, project_type):
-    """从文件名中提取产品DMC"""
+    """
+    从文件名中提取产品 DMC（唯一标识码）
+    """
     basename = os.path.basename(file_path)
     name_no_ext = os.path.splitext(basename)[0]
 
     if project_type == 'CUS':
+        # 匹配: 数字串#_ 格式（DMC在 # 之前）
         m = re.match(r'(\d+)#_', name_no_ext)
         if m:
             return m.group(1)
 
     elif project_type == 'EOL':
+        # 匹配: 文件名末尾方括号 [纯数字]
         m = re.search(r'\[(\d+)\]$', name_no_ext)
         if m:
             return m.group(1)
 
     elif project_type == 'FCT':
+        # 遍历所有方括号内容，取第一个长度≥30的纯数字串
         parts = re.findall(r'\[([^\]]+)\]', name_no_ext)
         for p in parts:
             if re.match(r'^\d{30,}$', p):
@@ -83,17 +109,42 @@ def extract_dmc(file_path, project_type):
 
 
 def parse_file(file_path, project_type):
-    """解析单个测试文件，返回记录列表(只保留失败行)"""
+    """
+    解析单个测试文件，提取所有 Status=Failed 的行并返回结构化记录
+
+    返回:
+        list[OrderedDict]: 每条失败记录为一个 OrderedDict，包含以下 9 个字段:
+            - 产品DMC
+            - 产品料号（半成品/成品）
+            - 测试站
+            - 测试工位(StationID)
+            - 测试时间(Start Date Time)
+            - failure mode(Test Step Name)
+            - 测试值(Measurement Value)
+            - 测试limit（Low Limit）
+            - 测试limit（High Limit）
+
+    文件结构分为两部分（以数据表头行为分界）:
+        1. 元数据区（表头之前）: 提取 StationID、产品料号等
+        2. 数据区（表头之后）: CSV 格式的测试步骤记录
+
+    编码策略:
+        - EOL 文件优先使用 gb2312 → gbk → utf-8（因含中文）
+        - FCT/CUS 文件优先使用 utf-8 → gb2312 → gbk
+        - 全部失败时降级为 utf-8 + errors='replace'
+    """
     records = []
 
-    # 提取常量信息
+    # ---- 从文件名提取不变信息 ----
     dmc = extract_dmc(file_path, project_type)
     test_time = parse_test_time_from_filename(file_path, project_type)
 
-    # 测试站名
+    # 测试站固定映射: EOL→EOL, FCT→FCT, CUS→CUS
     station_map = {'EOL': 'EOL', 'FCT': 'FCT', 'CUS': 'CUS'}
     test_station = station_map.get(project_type, '')
 
+    # ---- 文件编码处理 ----
+    # EOL 文件含中文，优先用 GB 系列编码
     if project_type == 'EOL':
         encodings = ['gb2312', 'gbk', 'utf-8']
     else:
@@ -108,20 +159,21 @@ def parse_file(file_path, project_type):
         except (UnicodeDecodeError, LookupError):
             continue
 
+    # 所有编码都失败时，使用 errors='replace' 强制读取
     if content is None:
         with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
             content = f.read()
 
     lines = content.splitlines()
 
-    # 解析元数据和数据部分
-    metadata = {}
-    data_header = None
-    data_rows = []
-    in_data = False
+    # ---- 解析元数据和数据行 ----
+    metadata = {}       # 元数据键值对
+    data_header = None  # 数据表头行（原始字符串）
+    data_rows = []      # 数据行列表
+    in_data = False     # 是否已进入数据区
     header_line_idx = -1
 
-    # 确定数据头关键字
+    # 根据项目类型设定: 表头关键字、目标列名、失败状态值
     if project_type == 'EOL':
         header_keyword = 'Test Step Name'
         step_col = 'Test Step Name'
@@ -137,6 +189,7 @@ def parse_file(file_path, project_type):
         high_col = 'HighLimit'
         status_fail = 'FAIL'
     elif project_type == 'CUS':
+        # CUS 表头是完整的列名行，直接用完整字符串匹配
         header_keyword = 'Step,Status,Measurement,Units,Low Limit,High Limit,Comparison Type'
         step_col = 'Step'
         measure_col = 'Measurement'
@@ -145,6 +198,7 @@ def parse_file(file_path, project_type):
         status_fail = 'Failed'
 
     for i, line in enumerate(lines):
+        # 检测到数据表头行后切换到数据模式
         if header_keyword in line:
             in_data = True
             header_line_idx = i
@@ -152,19 +206,22 @@ def parse_file(file_path, project_type):
             continue
 
         if not in_data:
-            # 元数据行
+            # ---- 元数据区解析 ----
+            # CUS: [Key],Value 格式
             if project_type == 'CUS':
                 m = re.match(r'\[([^\]]+)\],(.+)', line)
                 if m:
                     key = f'[{m.group(1)}]'
                     val = m.group(2).split(',')[0].strip()
                     metadata[key] = val
+            # EOL: Key,Value 格式
             elif project_type == 'EOL':
                 parts = line.split(',', 1)
                 if len(parts) == 2:
                     key = parts[0].strip()
                     val = parts[1].split(',')[0].strip()
                     metadata[key] = val
+            # FCT: Key:Value 格式（冒号在键名后面）
             elif project_type == 'FCT':
                 parts = line.split(',', 1)
                 if len(parts) >= 2:
@@ -172,17 +229,19 @@ def parse_file(file_path, project_type):
                     val = parts[1].split(',')[0].strip()
                     metadata[key] = val
         else:
-            # 数据行 - 需要跳过空行和分隔行
+            # ---- 数据区解析 ----
+            # 跳过表头行本身
             if i == header_line_idx:
                 continue
             stripped = line.strip()
+            # 跳过空行、分隔线（***开头）、结束标记（End开头）、RAD版权行
             if not stripped or stripped.startswith('*') or stripped.startswith('End'):
                 continue
             if stripped.startswith('RAD,') or stripped.startswith('RAD,'):
                 continue
             data_rows.append(line)
 
-    # 提取工位信息
+    # 提取工位信息（StationID）
     station_id = ''
     if project_type == 'EOL':
         station_id = metadata.get('StationID', '')
@@ -191,7 +250,7 @@ def parse_file(file_path, project_type):
     elif project_type == 'CUS':
         station_id = metadata.get('[Station]', '')
 
-    # 提取产品料号(仅FCT)
+    # 提取产品料号（半成品/成品）—— 仅 Function test 需要
     part_number = ''
     if project_type == 'FCT':
         pn = metadata.get('TsetNO', '')
@@ -199,29 +258,36 @@ def parse_file(file_path, project_type):
             pn = metadata.get('TsetVar', '')
         part_number = pn
 
-    # 解析数据头以获取列索引
+    # ---- 解析数据表头，定位各列索引 ----
     header_cols = next(csv.reader([data_header]))
 
     try:
+        # 通过表头列名查找索引位置
         idx_step = header_cols.index(step_col)
         idx_measure = header_cols.index(measure_col) if measure_col in header_cols else -1
         idx_low = header_cols.index(low_col) if low_col in header_cols else -1
         idx_high = header_cols.index(high_col) if high_col in header_cols else -1
 
-        # 状态列通常是第二列(索引1)
+        # 遍历每一行数据，只保留 Status=Failed/FAIL 的记录
+        # 状态列始终在索引 1（第二列）
         for row_str in data_rows:
             row = next(csv.reader([row_str]))
             if len(row) < 2:
                 continue
             status = row[1].strip() if len(row) > 1 else ''
+
+            # 只保留失败状态的记录
             if status != status_fail:
                 continue
 
+            # 安全提取各列值（防止索引越界）
             step_name = row[idx_step].strip() if idx_step < len(row) else ''
             measure_val = row[idx_measure].strip() if idx_measure >= 0 and idx_measure < len(row) else ''
             low_val = row[idx_low].strip() if idx_low >= 0 and idx_low < len(row) else ''
             high_val = row[idx_high].strip() if idx_high >= 0 and idx_high < len(row) else ''
 
+            # 构建输出记录: OrderedDict 保证列顺序固定
+            # DMC 前加单引号防止 Excel 打开时丢失精度
             record = OrderedDict([
                 ('产品DMC', f"'{dmc}"),
                 ('产品料号（半成品/成品）', part_number),
@@ -236,13 +302,16 @@ def parse_file(file_path, project_type):
             records.append(record)
 
     except (ValueError, IndexError):
+        # 表头解析失败时跳过该文件
         pass
 
     return records
 
 
 def parse_test_time_to_datetime(time_str):
-    """将 YYYY-MM-DD_HH:MM:SS 转为 datetime 对象"""
+    """
+    将文件名中提取的时间字符串转为 datetime 对象，用于时间范围比较
+    """
     try:
         return datetime.strptime(time_str, '%Y-%m-%d_%H:%M:%S')
     except ValueError:
@@ -251,26 +320,38 @@ def parse_test_time_to_datetime(time_str):
 
 def process_folder(folder_path, start_time_str, end_time_str, progress_callback=None):
     """
-    主处理函数
-    folder_path: 源文件夹
-    start_time_str: 开始时间 YYYY-MM-DD HH:MM:SS
-    end_time_str: 结束时间 YYYY-MM-DD HH:MM:SS
-    progress_callback: 进度回调函数(处理文件数, 总文件数)
+    主处理函数: 扫描文件夹 → 时间过滤 → 逐文件解析 → 合并所有失败记录
+
+    参数:
+        folder_path (str):      源文件夹路径（含 EOL/FCT/CUS 子目录）
+        start_time_str (str):   开始时间，格式 'YYYY-MM-DD HH:MM:SS'
+        end_time_str (str):     结束时间，格式 'YYYY-MM-DD HH:MM:SS'
+
+    返回:
+        list[OrderedDict]: 所有符合时间范围且 Status=Failed 的合并记录
+
+    处理流程:
+        1. 递归查找所有符合条件的 CSV 文件
+        2. 解析每个文件名中的测试时间
+        3. 只保留测试时间在 [start_dt, end_dt] 范围内的文件
+        4. 逐文件解析，提取失败行
+        5. 返回合并后的全部记录
     """
     all_records = []
     files = find_csv_files(folder_path)
 
-    # 预处理时间范围
+    # 将用户输入的时间字符串转为 datetime 对象
     start_dt = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
     end_dt = datetime.strptime(end_time_str, '%Y-%m-%d %H:%M:%S')
 
-    # 先用文件名中的时间过滤
+    # 按文件名中的测试时间过滤文件
     filtered_files = []
     file_times = []
     for fp in files:
         pt = get_project_type(fp)
         ft = parse_test_time_from_filename(fp, pt)
         ft_dt = parse_test_time_to_datetime(ft)
+        # 只有能正确解析时间的文件才参与时间范围比较
         if ft_dt and start_dt <= ft_dt <= end_dt:
             filtered_files.append(fp)
             file_times.append(ft)
@@ -281,6 +362,7 @@ def process_folder(folder_path, start_time_str, end_time_str, progress_callback=
         records = parse_file(fp, pt)
         all_records.extend(records)
 
+        # 通知 UI 刷新进度条
         if progress_callback:
             progress_callback(idx + 1, total)
 
@@ -288,19 +370,37 @@ def process_folder(folder_path, start_time_str, end_time_str, progress_callback=
 
 
 def save_output(records, output_folder, start_time_str, end_time_str):
-    """保存合并结果到CSV，文件名为测试时间段"""
+    """
+    将合并后的记录保存为 CSV 文件到指定输出目录
+
+    参数:
+        records (list[OrderedDict]): 合并后的记录列表
+        output_folder (str):         输出目录路径（不存在会自动创建）
+        start_time_str (str):        开始时间，用于文件命名
+        end_time_str (str):          结束时间，用于文件命名
+
+    返回:
+        str | None: 成功返回输出文件的完整路径，记录为空返回 None
+
+    输出文件名规则:
+        将时间中的空格换为 _ ，冒号换为 - ，然后用 __ 连接
+        例: 2025-12-03_14-03-09__2025-12-08_14-03-10.csv
+
+    编码: UTF-8-BOM (utf-8-sig)，确保 Excel 直接打开不乱码
+    """
     if not records:
         return None
 
     os.makedirs(output_folder, exist_ok=True)
 
-    # 命名规则为测试时间段
+    # 命名规则: 测试时间段
     start_clean = start_time_str.replace(' ', '_').replace(':', '-')
     end_clean = end_time_str.replace(' ', '_').replace(':', '-')
     file_name = f"{start_clean}__{end_clean}.csv"
     output_path = os.path.join(output_folder, file_name)
 
     fieldnames = list(records[0].keys())
+    # utf-8-sig = UTF-8 with BOM，Excel 双击打开即可正确显示中文
     with open(output_path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
