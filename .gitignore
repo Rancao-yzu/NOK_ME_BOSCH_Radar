@@ -1,0 +1,9 @@
+build
+devel
+output
+NOK测试报告
+OUT
+*.ver
+*.pyc
+__pycache__/
+**/.vscode
