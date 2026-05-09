@@ -39,7 +39,7 @@
 
 ### failure mode(Test Step Name)
 - 对于EOL项目，类似为：RCS,Failed,该列记录为RCS
-- 对于Function test项目，类似为：ArrayEleAmp Max/Min,Failed,该列记录为ArrayEleAmp Max/Min
+- 对于Function test项目，类似为：ArrayEleAmp Max/Min,FAIL,该列记录为ArrayEleAmp Max/Min
 - 对于Customizing项目，类似为：ExtendedSession,Failed,该列记录为ExtendedSession  
 填写为该列记录
 
