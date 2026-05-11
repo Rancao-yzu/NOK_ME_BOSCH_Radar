@@ -1,6 +1,7 @@
 import os
 import re
 import csv
+import time
 from datetime import datetime
 from collections import OrderedDict
 
@@ -57,7 +58,7 @@ def parse_test_time_from_filename(file_path, project_type):
         m = re.search(r'\[(\d{4}-\d{2}-\d{2})\]\[(\d{2}-\d{2}-\d{2})\]', name_no_ext)
         if m:
             date_part = m.group(1)
-            time_part = m.group(2).replace('-', ':')
+            time_part = m.group(2)
             return f"{date_part}_{time_part}"
 
     elif project_type == 'FCT':
@@ -65,7 +66,7 @@ def parse_test_time_from_filename(file_path, project_type):
         m = re.search(r'\[(\d{4}-\d{2}-\d{2})\s+(\d{2}-\d{2}-\d{2})\]', name_no_ext)
         if m:
             date_part = m.group(1)
-            time_part = m.group(2).replace('-', ':')
+            time_part = m.group(2)
             return f"{date_part}_{time_part}"
 
     elif project_type == 'CUS':
@@ -74,7 +75,7 @@ def parse_test_time_from_filename(file_path, project_type):
         if m:
             dt_str = m.group(1)
             dt = datetime.strptime(dt_str, '%Y%m%d%H%M%S')
-            return dt.strftime('%Y-%m-%d_%H:%M:%S')
+            return dt.strftime('%Y-%m-%d_%H-%M-%S')
 
     return ''
 
@@ -313,7 +314,7 @@ def parse_test_time_to_datetime(time_str):
     将文件名中提取的时间字符串转为 datetime 对象，用于时间范围比较
     """
     try:
-        return datetime.strptime(time_str, '%Y-%m-%d_%H:%M:%S')
+        return datetime.strptime(time_str, '%Y-%m-%d_%H-%M-%S')
     except ValueError:
         return None
 
@@ -339,6 +340,7 @@ def process_folder(folder_path, start_time_str, end_time_str, progress_callback=
     """
     all_records = []
     files = find_csv_files(folder_path)
+    time.sleep(0.2)
 
     # 将用户输入的时间字符串转为 datetime 对象
     start_dt = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
@@ -362,6 +364,7 @@ def process_folder(folder_path, start_time_str, end_time_str, progress_callback=
         records = parse_file(fp, pt)
         all_records.extend(records)
 
+        time.sleep(0.2)
         # 通知 UI 刷新进度条
         if progress_callback:
             progress_callback(idx + 1, total)
