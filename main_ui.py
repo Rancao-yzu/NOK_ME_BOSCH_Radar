@@ -386,8 +386,11 @@ class DataMergeApp:
             self.process_btn.config(state=tk.NORMAL)
             return
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        out_folder = os.path.join(script_dir, 'OUT')
+        if getattr(sys, 'frozen', False):
+            out_folder = os.path.join(os.path.dirname(sys.executable), 'OUT')
+        else:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            out_folder = os.path.join(script_dir, 'OUT')
         try:
             output_path = save_output(records, out_folder, start, end)
         except Exception as e:
