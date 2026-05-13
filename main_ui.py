@@ -253,12 +253,12 @@ class DataMergeApp:
 
         ttk.Label(time_inner, text="开始时间:", style='Card.TLabel').grid(
             row=0, column=0, sticky=tk.W, padx=(0, 8), pady=8)
-        self.start_picker = DateTimePicker(time_inner, default_dt=datetime(2025, 12, 3, 14, 3, 9))
+        self.start_picker = DateTimePicker(time_inner, default_dt=datetime(2025, 1, 1, 12, 0, 0))
         self.start_picker.grid(row=0, column=1, sticky=tk.W, pady=8)
 
         ttk.Label(time_inner, text="结束时间:", style='Card.TLabel').grid(
             row=1, column=0, sticky=tk.W, padx=(0, 8), pady=8)
-        self.end_picker = DateTimePicker(time_inner, default_dt=datetime(2025, 12, 8, 14, 3, 10))
+        self.end_picker = DateTimePicker(time_inner, default_dt=datetime(2026, 1, 1, 12, 0, 0))
         self.end_picker.grid(row=1, column=1, sticky=tk.W, pady=8)
 
         # ---- 操作区 ----

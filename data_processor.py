@@ -30,6 +30,11 @@ def get_project_type(file_path):
         - 父文件夹名含 'EOL'         → 'EOL'
         - 父文件夹名含 'Function'    → 'FCT'
         - 父文件夹名含 'Customizing' → 'CUS'
+
+    若父文件夹无法判断(UNKNOWN)，则回退到根据文件名特征判断:
+        - 文件名含 '#_'  → 'CUS' (Customizing项目，如 xxx#_20251203140309_Failed.csv)
+        - 文件名含 'EOL' → 'EOL' (如 [Failed][EOL-1]...[DMC].csv)
+        - 其余含 Fail/Failed → 'FCT' (如 [Fail][日期][DMC]...csv)
     """
     parent = os.path.basename(os.path.dirname(file_path))
     if 'EOL' in parent:
@@ -38,7 +43,14 @@ def get_project_type(file_path):
         return 'FCT'
     elif 'Customizing' in parent:
         return 'CUS'
-    return 'UNKNOWN'
+
+    basename = os.path.basename(file_path)
+    if '#_' in basename:
+        return 'CUS'
+    elif 'EOL' in basename:
+        return 'EOL'
+    else:
+        return 'FCT'
 
 
 def parse_test_time_from_filename(file_path, project_type):
