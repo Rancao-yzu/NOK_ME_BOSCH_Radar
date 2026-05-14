@@ -59,7 +59,7 @@ def parse_test_time_from_filename(file_path, project_type):
 
     各项目文件名的日期时间提取规则:
         - EOL:  文件名中 [2025-11-30][16-20-13] 格式
-        - FCT:  文件名中 [2025-12-02 00-40-24] 格式（日期和时间之间可能有空格）
+        - FCT:  文件名中 [2025-12-02 00-40-24] 格式（日期和时间之间有空格）
         - CUS:  文件名中 #_20251203140309_Failed 格式（14位连续数字的时间戳）
     """
     basename = os.path.basename(file_path)
@@ -277,17 +277,17 @@ def parse_file(file_path, project_type):
     try:
         # 通过表头列名查找索引位置
         idx_step = header_cols.index(step_col)
+        idx_status = header_cols.index('Status') if 'Status' in header_cols else 1
         idx_measure = header_cols.index(measure_col) if measure_col in header_cols else -1
         idx_low = header_cols.index(low_col) if low_col in header_cols else -1
         idx_high = header_cols.index(high_col) if high_col in header_cols else -1
 
         # 遍历每一行数据，只保留 Status=Failed/FAIL 的记录
-        # 状态列始终在索引 1（第二列）
         for row_str in data_rows:
             row = next(csv.reader([row_str]))
-            if len(row) < 2:
+            if len(row) <= idx_status:
                 continue
-            status = row[1].strip() if len(row) > 1 else ''
+            status = row[idx_status].strip()
 
             # 只保留失败状态的记录
             if status != status_fail:
@@ -298,6 +298,13 @@ def parse_file(file_path, project_type):
             measure_val = row[idx_measure].strip() if idx_measure >= 0 and idx_measure < len(row) else ''
             low_val = row[idx_low].strip() if idx_low >= 0 and idx_low < len(row) else ''
             high_val = row[idx_high].strip() if idx_high >= 0 and idx_high < len(row) else ''
+
+            if measure_val in ('-INF', 'INF'):
+                measure_val = ''
+            if low_val in ('-INF', 'INF'):
+                low_val = ''
+            if high_val in ('-INF', 'INF'):
+                high_val = ''
 
             # 构建输出记录: OrderedDict 保证列顺序固定
             # DMC 前加单引号防止 Excel 打开时丢失精度
@@ -411,7 +418,7 @@ def save_output(records, output_folder, start_time_str, end_time_str):
     # 命名规则: 测试时间段
     start_clean = start_time_str.replace(' ', '_').replace(':', '-')
     end_clean = end_time_str.replace(' ', '_').replace(':', '-')
-    file_name = f"{start_clean}__{end_clean}.csv"
+    file_name = f"[{start_clean}]__[{end_clean}]_Failed.csv"
     output_path = os.path.join(output_folder, file_name)
 
     fieldnames = list(records[0].keys())
