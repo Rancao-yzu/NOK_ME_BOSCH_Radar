@@ -153,8 +153,7 @@ def parse_file(file_path, project_type):
     test_time = parse_test_time_from_filename(file_path, project_type)
 
     # 测试站固定映射: EOL→EOL, FCT→FCT, CUS→CUS
-    station_map = {'EOL': 'EOL', 'FCT': 'FCT', 'CUS': 'CUS'}
-    test_station = station_map.get(project_type, '')
+    test_station = project_type
 
     # ---- 文件编码处理 ----
     # EOL 文件含中文，优先用 GB 系列编码
@@ -184,7 +183,7 @@ def parse_file(file_path, project_type):
     data_header = None  # 数据表头行（原始字符串）
     data_rows = []      # 数据行列表
     in_data = False     # 是否已进入数据区
-    header_line_idx = -1
+    header_line_idx = -1  # 数据表头行索引
 
     # 根据项目类型设定: 表头关键字、目标列名、失败状态值
     if project_type == 'EOL':
@@ -299,8 +298,6 @@ def parse_file(file_path, project_type):
             low_val = row[idx_low].strip() if idx_low >= 0 and idx_low < len(row) else ''
             high_val = row[idx_high].strip() if idx_high >= 0 and idx_high < len(row) else ''
 
-            if measure_val in ('-INF', 'INF'):
-                measure_val = ''
             if low_val in ('-INF', 'INF'):
                 low_val = ''
             if high_val in ('-INF', 'INF'):
@@ -365,21 +362,18 @@ def process_folder(folder_path, start_time_str, end_time_str, progress_callback=
     start_dt = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
     end_dt = datetime.strptime(end_time_str, '%Y-%m-%d %H:%M:%S')
 
-    # 按文件名中的测试时间过滤文件
-    filtered_files = []
-    file_times = []
+    filtered = []
     for fp in files:
         pt = get_project_type(fp)
         ft = parse_test_time_from_filename(fp, pt)
         ft_dt = parse_test_time_to_datetime(ft)
-        # 只有能正确解析时间的文件才参与时间范围比较
+        # 过滤出在时间范围内的文件，存入 filtered 列表
         if ft_dt and start_dt <= ft_dt <= end_dt:
-            filtered_files.append(fp)
-            file_times.append(ft)
+            filtered.append((fp, pt))
 
-    total = len(filtered_files)
-    for idx, fp in enumerate(filtered_files):
-        pt = get_project_type(fp)
+    total = len(filtered)
+    for idx, (fp, pt) in enumerate(filtered):
+        # 解析每个文件（主要解析步骤）
         records = parse_file(fp, pt)
         all_records.extend(records)
 
@@ -413,6 +407,7 @@ def save_output(records, output_folder, start_time_str, end_time_str):
     if not records:
         return None
 
+    # 确保输出目录存在，不存在则创建
     os.makedirs(output_folder, exist_ok=True)
 
     # 命名规则: 测试时间段
