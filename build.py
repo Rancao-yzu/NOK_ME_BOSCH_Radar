@@ -3,10 +3,12 @@ import subprocess
 import sys
 import shutil
 
+# only can be used in windows paltform
+
 IS_WIN = sys.platform == "win32"
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-MAIN_SCRIPT = os.path.join(PROJECT_DIR, "main_ui.py")
+MAIN_SCRIPT = os.path.join(PROJECT_DIR, "src", "main_ui.py")
 OUT_DIR = os.path.join(PROJECT_DIR, "dist")
 NAME = "NOK数据合并工具"
 
@@ -45,16 +47,11 @@ COMMON_EXCLUDES = [
     "turtle",
     "turtledemo",
     "unittest",
-    "urllib",
     "uuid",
     "venv",
     "wsgiref",
     "xml",
     "xmlrpc",
-    "zipapp",
-    "zipfile",
-    "zipimport",
-    "zoneinfo",
 ]
 
 LINUX_EXCLUDES = [
@@ -63,7 +60,6 @@ LINUX_EXCLUDES = [
 
 WIN_EXCLUDES = [
     "msilib",
-    "_winapi",
 ]
 
 def get_excludes():
@@ -103,7 +99,7 @@ def build():
         "--noconfirm",
         f"--name={NAME}",
         f"--distpath={OUT_DIR}",
-        "--add-data", f"{os.path.join(PROJECT_DIR, 'data_processor.py')}{os.pathsep}.",
+        "--add-data", f"{os.path.join(PROJECT_DIR, 'src', 'data_processor.py')}{os.pathsep}.",
     ]
 
     excludes = get_excludes()
