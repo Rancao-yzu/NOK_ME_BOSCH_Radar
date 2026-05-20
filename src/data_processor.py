@@ -27,22 +27,11 @@ def get_project_type(file_path):
     根据文件所在的父文件夹名称判断项目类型
 
     判断规则:
-        - 父文件夹名含 'EOL'         → 'EOL'
-        - 父文件夹名含 'Function'    → 'FCT'
-        - 父文件夹名含 'Customizing' → 'CUS'
-
-    若父文件夹无法判断(UNKNOWN)，则回退到根据文件名特征判断:
+    根据文件名特征判断:
         - 文件名含 '#_'  → 'CUS' (Customizing项目，如 xxx#_20251203140309_Failed.csv)
         - 文件名含 'EOL' → 'EOL' (如 [Failed][EOL-1]...[DMC].csv)
         - 其余含 Fail/Failed → 'FCT' (如 [Fail][日期][DMC]...csv)
     """
-    parent = os.path.basename(os.path.dirname(file_path))
-    if 'EOL' in parent:
-        return 'EOL'
-    elif 'Function' in parent:
-        return 'FCT'
-    elif 'Customizing' in parent:
-        return 'CUS'
 
     basename = os.path.basename(file_path)
     if '#_' in basename:
@@ -356,7 +345,7 @@ def process_folder(folder_path, start_time_str, end_time_str, progress_callback=
     """
     all_records = []
     files = find_csv_files(folder_path)
-    time.sleep(0.2)
+    time.sleep(0.25)
 
     # 将用户输入的时间字符串转为 datetime 对象
     start_dt = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
@@ -377,7 +366,7 @@ def process_folder(folder_path, start_time_str, end_time_str, progress_callback=
         records = parse_file(fp, pt)
         all_records.extend(records)
 
-        time.sleep(0.2)
+        time.sleep(0.25)
         # 通知 UI 刷新进度条
         if progress_callback:
             progress_callback(idx + 1, total)
