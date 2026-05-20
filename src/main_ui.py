@@ -204,7 +204,7 @@ class DataMergeApp:
         banner_inner = tk.Frame(banner, bg=ORANGE_PRIMARY)
         banner_inner.pack(expand=True)
 
-        tk.Label(banner_inner, text="测试数据合并工具 V1.2", font=('Microsoft YaHei', 18, 'bold'),
+        tk.Label(banner_inner, text="测试数据合并工具 V1.3", font=('Microsoft YaHei', 18, 'bold'),
                  fg='white', bg=ORANGE_PRIMARY).pack(pady=(8, 0))
 
         mission_frame = tk.Frame(banner_inner, bg=ORANGE_PRIMARY)
