@@ -134,7 +134,7 @@ class DateTimePicker(ttk.Frame):
 class DataMergeApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("测试数据合并工具 V1.2")
+        self.root.title("测试数据合并工具 V1.3")
         self.root.geometry("820x660")
         self.root.resizable(True, True)
         self.root.minsize(720, 580)
@@ -214,14 +214,11 @@ class DataMergeApp:
         tk.Label(mission_frame, text=' @', font=('Microsoft YaHei', 12),
                  fg='#FFCC80', bg=ORANGE_PRIMARY).pack(side=tk.LEFT, pady=(2, 0))
 
-        link = tk.Label(mission_frame, text="威孚智感（无锡）科技有限公司",
+        link = tk.Label(mission_frame, text=" 威孚智感（无锡）科技有限公司 ",
                         font=('Microsoft YaHei', 12, 'underline'), fg='white',
                         bg=ORANGE_PRIMARY, cursor='hand2')
         link.pack(side=tk.LEFT, pady=(2, 0))
         link.bind('<Button-1>', lambda e: self._open_url('http://wfss.weifu.com.cn/index.html'))
-
-        tk.Label(mission_frame, text=' 版权所有', font=('Microsoft YaHei', 12),
-                 fg='#FFCC80', bg=ORANGE_PRIMARY).pack(side=tk.LEFT, pady=(2, 0))
 
         # ---- 主体内容区 ----
         main_frame = tk.Frame(self.root, bg=BG_MAIN)
