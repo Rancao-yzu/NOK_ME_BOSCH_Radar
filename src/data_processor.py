@@ -361,9 +361,12 @@ def process_folder(folder_path, start_time_str, end_time_str, progress_callback=
             filtered.append((fp, pt))
 
     total = len(filtered)
+    print(f"Total files to process: {total}")
+
     for idx, (fp, pt) in enumerate(filtered):
         # 解析每个文件（主要解析步骤）
         records = parse_file(fp, pt)
+        print(f"Processed {fp} with {len(records)} records")
         all_records.extend(records)
 
         time.sleep(0.25)
@@ -404,6 +407,7 @@ def save_output(records, output_folder, start_time_str, end_time_str):
     end_clean = end_time_str.replace(' ', '_').replace(':', '-')
     file_name = f"[{start_clean}]__[{end_clean}]_Failed.csv"
     output_path = os.path.join(output_folder, file_name)
+    print(f"Saving to: {output_path}")
 
     fieldnames = list(records[0].keys())
     # utf-8-sig = UTF-8 with BOM，Excel 双击打开即可正确显示中文

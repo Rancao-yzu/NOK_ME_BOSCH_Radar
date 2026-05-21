@@ -397,7 +397,7 @@ class DataMergeApp:
             return
 
         for i, rec in enumerate(records):
-            if i >= 500:
+            if i >= 200:
                 break
             vals = [rec.get(col, '') for col in self.tree['columns']]
             tag = 'even' if i % 2 == 0 else 'odd'
