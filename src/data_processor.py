@@ -405,7 +405,7 @@ def save_output(records, output_folder, start_time_str, end_time_str):
     # 命名规则: 测试时间段
     start_clean = start_time_str.replace(' ', '_').replace(':', '-')
     end_clean = end_time_str.replace(' ', '_').replace(':', '-')
-    file_name = f"[{start_clean}]__[{end_clean}]_Failed.csv"
+    file_name = f"{start_clean}__{end_clean}_Failed.csv"
     output_path = os.path.join(output_folder, file_name)
     print(f"Saving to: {output_path}")
 
